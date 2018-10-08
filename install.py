@@ -4,6 +4,8 @@ import platform
 import zipfile
 import os
 import urllib
+import json
+import shutil
 
 parser = argparse.ArgumentParser(description='Install HashiCorp tools')
 
@@ -17,10 +19,10 @@ parser.add_argument('--Archive-location', default='/tmp/', help='Location of loc
 parser.add_argument('--Install-dir', '-id', default='/usr/local/bin', help='Where to place the executable.  Default: /usr/local/bin')
 parser.add_argument('--no-user-creation', default=False, help='Do not create user or group')
 #parser.add_argument('--no-install-prereqs', default=False, help='Do not install jq, wget, unzip'))
-parser.add_argument('--no-create-directories', default=False, help='Do not create directories'))
-parser.add_argument('--no-systemd-unit-files', default=False, help='Do not create u  ser or group'))
-parser.add_argument('--no-create-directories', default=False, help='Do not create user or group'))
-parser.add_argument('--no-enable-systemd-service', default=False, help='Do not create user or group'))
+parser.add_argument('--no-create-directories', default=False, help='Do not create directories')
+parser.add_argument('--no-systemd-unit-files', default=False, help='Do not create u  ser or group')
+parser.add_argument('--no-create-directories', default=False, help='Do not create user or group')
+parser.add_argument('--no-enable-systemd-service', default=False, help='Do not create user or group')
 
 # Consul/Nomad options
 parser.add_argument('--Is-Server', '-server', type=bool, default=False, help="Install default server config file")
@@ -42,7 +44,7 @@ def build_dir_name():
     if args.Version.lower() is 'latest':
         return get_latest_version()
     else:
-        return program_name + '_' + version
+        return program_name + '_' + args.Version.lower()
 
 # should return something like '1.2.3'
 def get_latest_version():
@@ -72,128 +74,6 @@ def download_binary(url):
 
 def retrieve_from_s3(path):
      print('define me!')
-
-
-# start the install
-if create_directories:
-    print("Creating directories")
-    os.makedirs("/etc/{}/".format(program_name))
-    shutil.chown("/etc/{}/".format(program_name), user=program_name, group=program_name)
-    if program_name is not "vault":
-        os.makedirs("/opt/{}/".format(program_name))
-        shutil.chown("/opt/{}/".format(program_name), user=program_name, group=program_name)
-
-if create_user:
-    print('Creating {} user and group'.format(program_name))
-    run_cmd('sudo adduser --no-create-home --disabled-password --gecos "" {}'.format(program_name))
-
-
-if retrieve_binary:
-    print('Retrieving binary from {}'.format(args.Download_location))
-    download_binary()
-    unzip('/tmp/{}.zip'.format(program_name))
-    shutil.move('/tmp/{}'.format(program_name), '{}/{}'.format(args.Install_dir, program_name)
-    print('{} placed in {}'.format(program_name, args.Install_dir))
-
-
-if create_systemd:
-    print('Creating systemd unit files...')
-    path = '/lib/systemd/system/{}.service'.format(program_name)
-    unit_file = open(path, 'w')
-    units = {
-        'consul': consul_unit_file,
-        'vault': vault_unit_file,
-        'nomad': nomad_unit_file
-    }
-    unit_file.write(units[program_name])
-    unit_file.close()
-
-if enable_service:
-    commands = [
-        "sudo systemctl daemon-reload",
-        "sudo systemctl disable {}.service".format(program_name)
-    ]
-
-if build_conf:
-
-
-def build_hcl_config(conf, value):
-    conf += conf + "\nvalue"
-    return conf
-
-def build_consul_config():
-    conf = 'client_addr = "0.0.0.0"\ndata_dir    = "/opt/consul"'
-    build_hcl_config(conf, 'server = {}'.format(str(args.Is_Server).lower()))
-    build_hcl_config(conf, 'datacenter = {}'.format(str(args.Datacenter).lower()))
-    build_hcl_config(conf, 'retry_join = [{}]'.format(str(args.Autojoin)))
-
-
-client_hcl = """
-client_addr      = "0.0.0.0"
-data_dir         = "/opt/consul"
-datacenter       = "east"
-log_level        = "INFO"
-server           = false
-acl_datacenter   = "east"
-acl_down_policy  = "extend-cache"
-retry_join       = [
-    "provider=gce project_name=connect-env tag_value=consul-server"
-]
-"""
-
-
-s = '''
-echo "Updating and installing required software..."
-sudo DEBIAN_FRONTEND=noninteractive apt-get update -qq > /dev/null
-sudo DEBIAN_FRONTEND=noninteractive apt-get -qq upgrade > /dev/null
-sudo DEBIAN_FRONTEND=noninteractive apt-get install -qq unzip wget jq python3-pip > /dev/null
-
-# Put consul.zip file in /tmp before running the script, or
-echo "Installing Consul"
-if [ ! -f /tmp/consul.zip ]; then
-    echo "Downloading latest Consul binary..."
-    cd /tmp && wget `echo "https://releases.hashicorp.com/consul/$(curl -s https://checkpoint-api.hashicorp.com/v1/check/consul | jq -r -M '.current_version')/consul_$(curl -s https://checkpoint-api.hashicorp.com/v1/check/consul | jq -r -M '.current_version')_linux_amd64.zip"` -O consul.zip
-fi
-
-cd /tmp && sudo unzip consul.zip -d /usr/local/bin/
-
-echo "Creating consul user and group"
-sudo adduser --no-create-home --disabled-password --gecos "" consul
-
-echo "Creating directories"
-sudo mkdir -p /etc/consul/
-sudo chown -R consul:consul /etc/consul/
-sudo mkdir -p /opt/consul/
-sudo chown -R consul:consul /opt/consul/
-
-
-# systemd
-echo "creating systemd unit file"
-cat <<EOF | sudo tee /lib/systemd/system/consul.service
-[Unit]
-Description=Consul Agent
-Requires=network-online.target
-After=network.target
-
-[Service]
-User=consul
-Group=consul
-ExecStart=/usr/local/bin/consul agent -config-dir /etc/consul/ $FLAGS
-ExecReload=/bin/kill -HUP $MAINPID
-KillSignal=SIGTERM
-Restart=on-failure
-LimitNOFILE=131072
-[Install]
-WantedBy=multi-user.target
-EOF
-
-sudo chmod 0664 /lib/systemd/system/consul*
-
-# we don't want to enable the service so this is suitable for image building
-sudo systemctl daemon-reload
-sudo systemctl disable consul.service
-'''
-
 
 # Including our unit files
 consul_unit_file = '''
@@ -274,3 +154,166 @@ LimitNOFILE=65536
 [Install]
 WantedBy=multi-user.target
 '''
+
+# Reference the function based on program_name 
+config_builder = {
+    'consul' : build_consul_config,
+    'vault'  : build_vault_config,
+    'nomad'  : build_nomad_config
+}
+
+
+create_directories = False
+create_user = False
+retrieve_binary = False
+create_systemd = False
+enable_service = False
+build_conf = False
+
+# start the install
+if create_directories:
+    print("Creating directories")
+    os.makedirs("/etc/{}/".format(program_name))
+    shutil.chown("/etc/{}/".format(program_name), user=program_name, group=program_name)
+    if program_name is not "vault":
+        os.makedirs("/opt/{}/".format(program_name))
+        shutil.chown("/opt/{}/".format(program_name), user=program_name, group=program_name)
+
+if create_user:
+    print('Creating {} user and group'.format(program_name))
+    run_cmd('sudo adduser --no-create-home --disabled-password --gecos "" {}'.format(program_name))
+
+
+if retrieve_binary:
+    print('Retrieving binary from {}'.format(args.Download_location))
+    download_binary(args.Download_location)
+    unzip('/tmp/{}.zip'.format(program_name))
+    shutil.move('/tmp/{}'.format(program_name), '{}/{}'.format(args.Install_dir, program_name))
+    print('{} placed in {}'.format(program_name, args.Install_dir))
+
+
+if create_systemd:
+    print('Creating systemd unit files...')
+    path = '/lib/systemd/system/{}.service'.format(program_name)
+    unit_file = open(path, 'w')
+    units = {
+        'consul': consul_unit_file,
+        'vault': vault_unit_file,
+        'nomad': nomad_unit_file
+    }
+    unit_file.write(units[program_name])
+    unit_file.close()
+
+if enable_service:
+    commands = [
+        "sudo systemctl daemon-reload",
+        "sudo systemctl disable {}.service".format(program_name)
+    ]
+
+if build_conf:
+    print("Building {} config file".format(program_name))
+    config_builder[program_name]()
+
+
+
+# Please note that this is not a fully featured lexer/parser.  You must 
+# ensure that you are passing in what will become valid HCL.
+def build_hcl_config(conf, value):
+    conf += conf + "\nvalue"
+
+def build_consul_config():
+    conf = 'client_addr = "0.0.0.0"\ndata_dir    = "/opt/consul"'
+    build_hcl_config(conf, 'server = {}'.format(str(args.Is_Server).lower()))
+    build_hcl_config(conf, 'datacenter = {}'.format(str(args.Datacenter).lower()))
+    build_hcl_config(conf, 'retry_join = [{}]'.format(str(args.Autojoin)))
+
+def build_nomad_config():
+    conf = 'client_addr = "0.0.0.0"\ndata_dir    = "/opt/consul"'
+    build_hcl_config(conf, 'server = {}'.format(str(args.Is_Server).lower()))
+    build_hcl_config(conf, 'datacenter = {}'.format(str(args.Datacenter).lower()))
+    build_hcl_config(conf, 'retry_join = [{}]'.format(str(args.Autojoin)))
+
+def build_vault_config():
+    conf = "ui = true\n"
+    vault_storage(conf)
+    vault_telemetry(conf)
+    vault_listener(conf)
+
+
+def vault_storage(conf):
+    return
+
+def vault_telemetry(conf):
+    return
+
+def vault_listener(conf):
+    return
+
+client_hcl = """
+client_addr      = "0.0.0.0"
+data_dir         = "/opt/consul"
+datacenter       = "east"
+log_level        = "INFO"
+server           = false
+acl_datacenter   = "east"
+acl_down_policy  = "extend-cache"
+retry_join       = [
+    "provider=gce project_name=connect-env tag_value=consul-server"
+]
+"""
+
+
+s = '''
+echo "Updating and installing required software..."
+sudo DEBIAN_FRONTEND=noninteractive apt-get update -qq > /dev/null
+sudo DEBIAN_FRONTEND=noninteractive apt-get -qq upgrade > /dev/null
+sudo DEBIAN_FRONTEND=noninteractive apt-get install -qq unzip wget jq python3-pip > /dev/null
+
+# Put consul.zip file in /tmp before running the script, or
+echo "Installing Consul"
+if [ ! -f /tmp/consul.zip ]; then
+    echo "Downloading latest Consul binary..."
+    cd /tmp && wget `echo "https://releases.hashicorp.com/consul/$(curl -s https://checkpoint-api.hashicorp.com/v1/check/consul | jq -r -M '.current_version')/consul_$(curl -s https://checkpoint-api.hashicorp.com/v1/check/consul | jq -r -M '.current_version')_linux_amd64.zip"` -O consul.zip
+fi
+
+cd /tmp && sudo unzip consul.zip -d /usr/local/bin/
+
+echo "Creating consul user and group"
+sudo adduser --no-create-home --disabled-password --gecos "" consul
+
+echo "Creating directories"
+sudo mkdir -p /etc/consul/
+sudo chown -R consul:consul /etc/consul/
+sudo mkdir -p /opt/consul/
+sudo chown -R consul:consul /opt/consul/
+
+
+# systemd
+echo "creating systemd unit file"
+cat <<EOF | sudo tee /lib/systemd/system/consul.service
+[Unit]
+Description=Consul Agent
+Requires=network-online.target
+After=network.target
+
+[Service]
+User=consul
+Group=consul
+ExecStart=/usr/local/bin/consul agent -config-dir /etc/consul/ $FLAGS
+ExecReload=/bin/kill -HUP $MAINPID
+KillSignal=SIGTERM
+Restart=on-failure
+LimitNOFILE=131072
+[Install]
+WantedBy=multi-user.target
+EOF
+
+sudo chmod 0664 /lib/systemd/system/consul*
+
+# we don't want to enable the service so this is suitable for image building
+sudo systemctl daemon-reload
+sudo systemctl disable consul.service
+'''
+
+
+
