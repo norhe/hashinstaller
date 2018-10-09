@@ -15,7 +15,7 @@ parser.add_argument('--Program', '-p', choices=['consul', 'Consul', 'vault', 'Va
 parser.add_argument('--Version', '-v', default='latest',help='The version to download and install (default: latest open source version)')
 parser.add_argument('--Download-location', '-loc', default='https://releases.hashicorp.com', help='The URL to download from (default: https://releases.hashicorp.com)')
 parser.add_argument('--Skip-download', type=bool, default=False, help='Use local archive')
-parser.add_argument('--Archive-location', default='/tmp/', help='Location of local archive')
+parser.add_argument('--Archive-location', '-al', default='', help='Location of local archive')
 parser.add_argument('--Install-dir', '-id', default='/usr/local/bin', help='Where to place the executable.  Default: /usr/local/bin')
 parser.add_argument('--Create-users', '-cu', default=True, help='Create user or group')
 #parser.add_argument('--no-install-prereqs', default=False, help='Do not install jq, wget, unzip'))
@@ -23,6 +23,8 @@ parser.add_argument('--Create-directories', '-cd', default=True, help='Create di
 parser.add_argument('--Create-unit-files', '-cuf', default=True, help='Create systemd unit files')
 parser.add_argument('--Enable-systemd-service', '-ess', default=True, help='Enable systemd service')
 parser.add_argument('--Create-config-file', '-ccf',default=False, help="Build config file")
+
+parser.add_argument('--Config-only', '-co', default=False, help="Only create the config file")
 
 # Consul/Nomad options
 parser.add_argument('--Is-Server', '-server', type=bool, default=False, help="Install default server config file")
@@ -37,7 +39,6 @@ parser.add_argument('--Config-File', help='Location of config file (i.e., /tmp/c
 args = parser.parse_args()
 
 program_name = args.program_name.lower()
-print(program_name)
 
 # should return something like 'consul_1.2.3'
 def build_dir_name():
@@ -168,26 +169,29 @@ WantedBy=multi-user.target
 # Please note that this is not a fully featured lexer/parser.  You must 
 # ensure that you are passing in what will become valid HCL.
 def build_hcl_config(conf, value):
-    conf += conf + "\nvalue"
+    conf += conf + "\n{}".format(value)
+    return conf
 
 def build_consul_config():
     conf = 'client_addr = "0.0.0.0"\ndata_dir    = "/opt/consul"'
-    build_hcl_config(conf, 'server = {}'.format(str(args.Is_Server).lower()))
-    build_hcl_config(conf, 'datacenter = {}'.format(str(args.Datacenter).lower()))
-    build_hcl_config(conf, 'retry_join = [{}]'.format(str(args.Autojoin)))
+    conf = build_hcl_config(conf, 'server = {}'.format(str(args.Is_Server).lower()))
+    conf = build_hcl_config(conf, 'datacenter = {}'.format(str(args.Datacenter).lower()))
+    conf = build_hcl_config(conf, 'retry_join = [{}]'.format(str(args.Autojoin)))
+    return conf
 
 def build_nomad_config():
     conf = 'client_addr = "0.0.0.0"\ndata_dir    = "/opt/nomad"'
     build_hcl_config(conf, 'server = {}'.format(str(args.Is_Server).lower()))
     build_hcl_config(conf, 'datacenter = {}'.format(str(args.Datacenter).lower()))
     build_hcl_config(conf, 'retry_join = [{}]'.format(str(args.Autojoin)))
+    return conf
 
 def build_vault_config():
     conf = "ui = true\n"
     vault_storage(conf)
     vault_telemetry(conf)
     vault_listener(conf)
-
+    return conf
 
 def vault_storage(conf):
     return
@@ -281,53 +285,61 @@ build_conf = args.Create_config_file
 
 # start the install
 if __name__ == "__main__":
-    if create_user:
-        print('Creating {} user and group'.format(program_name))
-        run_cmd('sudo adduser --no-create-home --disabled-password --gecos "" {}'.format(program_name))
+    if args.Config_only is False:
+        if create_user:
+            print('Creating {} user and group'.format(program_name))
+            run_cmd('sudo adduser --no-create-home --disabled-password --gecos "" {}'.format(program_name))
 
-    if create_directories:
-        print("Creating directories")
-        os.makedirs("/etc/{}/".format(program_name), exist_ok=True)
-        shutil.chown("/etc/{}/".format(program_name), user=program_name, group=program_name)
-        if program_name is not "vault":
-            os.makedirs("/opt/{}/".format(program_name),exist_ok=True)
-            shutil.chown("/opt/{}/".format(program_name), user=program_name, group=program_name)
-
-
-    if retrieve_binary:
-        print('Retrieving binary from {}'.format(args.Download_location))
-        if args.Version.lower() == 'latest':
-            version = get_latest_version()
-        else:        
-            version = args.Version    
-        url = '{}/{}'.format(args.Download_location, build_download_url(version))
-        
-        print('Downloading {}'.format(url))
-        download_binary(url)
-        unzip('/tmp/{}.zip'.format(program_name))
-        shutil.move('/tmp/{}'.format(program_name), '{}/{}'.format(args.Install_dir, program_name))
-        print('{} placed in {}'.format(program_name, args.Install_dir))
+        if create_directories:
+            print("Creating directories")
+            os.makedirs("/etc/{}/".format(program_name), exist_ok=True)
+            shutil.chown("/etc/{}/".format(program_name), user=program_name, group=program_name)
+            if program_name is not "vault":
+                os.makedirs("/opt/{}/".format(program_name),exist_ok=True)
+                shutil.chown("/opt/{}/".format(program_name), user=program_name, group=program_name)
 
 
-    if create_systemd:
-        print('Creating systemd unit files...')
-        path = '/lib/systemd/system/{}.service'.format(program_name)
-        unit_file = open(path, 'w')
-        units = {
-            'consul': consul_unit_file,
-            'vault': vault_unit_file,
-            'nomad': nomad_unit_file
-        }
-        unit_file.write(units[program_name])
-        unit_file.close()
+        if retrieve_binary:
+            if not args.Archive_location:
+                print('Retrieving binary from {}'.format(args.Download_location))
+                if args.Version.lower() == 'latest':
+                    version = get_latest_version()
+                else:        
+                    version = args.Version    
+                url = '{}/{}'.format(args.Download_location, build_download_url(version))
+                
+                print('Downloading {}'.format(url))
+                download_binary(url)
+            else:
+                print('Unzipping binary {}'.format(args.Archive_location))
+                unzip(args.Archive_location)
+            unzip('/tmp/{}.zip'.format(program_name))
+            shutil.move('/tmp/{}'.format(program_name), '{}/{}'.format(args.Install_dir, program_name))
+            print('{} placed in {}'.format(program_name, args.Install_dir))
 
-    if enable_service:
-        commands = [
-            "sudo systemctl daemon-reload",
-            "sudo systemctl disable {}.service".format(program_name)
-        ]
 
-    if build_conf:
-        print("Building {} config file".format(program_name))
-        config_builder[program_name]()
+        if create_systemd:
+            print('Creating systemd unit files...')
+            path = '/lib/systemd/system/{}.service'.format(program_name)
+            unit_file = open(path, 'w')
+            units = {
+                'consul': consul_unit_file,
+                'vault': vault_unit_file,
+                'nomad': nomad_unit_file
+            }
+            unit_file.write(units[program_name])
+            unit_file.close()
+
+        if enable_service:
+            commands = [
+                "sudo systemctl daemon-reload",
+                "sudo systemctl disable {}.service".format(program_name)
+            ]
+
+        if build_conf:
+            print("Building {} config file".format(program_name))
+            config_builder[program_name]()
+
+    if args.Config_only or args.Create_config_file:
+        print(config_builder[program_name]())
 
