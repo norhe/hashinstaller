@@ -124,6 +124,7 @@ PrivateDevices=yes
 SecureBits=keep-caps
 Capabilities=CAP_IPC_LOCK+ep
 CapabilityBoundingSet=CAP_SYSLOG CAP_IPC_LOCK
+LimitMEMLOCK=infinity
 NoNewPrivileges=yes
 ExecStart={}/vault server -config=/etc/vault/vault.hcl
 ExecReload=/bin/kill --signal HUP $MAINPID
