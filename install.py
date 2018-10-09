@@ -110,7 +110,7 @@ Description="HashiCorp Vault - A tool for managing secrets"
 Documentation=https://www.vaultproject.io/docs/
 Requires=network-online.target
 After=network-online.target
-ConditionFileNotEmpty=/etc/vault.d/vault.hcl
+ConditionFileNotEmpty=/etc/vault/vault.hcl
 Wants=consul.service
 After=consul.service
 
@@ -125,7 +125,7 @@ SecureBits=keep-caps
 Capabilities=CAP_IPC_LOCK+ep
 CapabilityBoundingSet=CAP_SYSLOG CAP_IPC_LOCK
 NoNewPrivileges=yes
-ExecStart={}/vault server -config=/etc/vault.d/vault.hcl
+ExecStart={}/vault server -config=/etc/vault/vault.hcl
 ExecReload=/bin/kill --signal HUP $MAINPID
 KillMode=process
 KillSignal=SIGINT
