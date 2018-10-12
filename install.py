@@ -9,9 +9,9 @@ import shutil
 
 parser = argparse.ArgumentParser(description='Install HashiCorp tools')
 
-parser.add_argument('--Program', '-p', choices=['consul', 'Consul', 'vault', 'Vault', 'nomad', 'Nomad'],
+parser.add_argument('--Program', '-p', choices=['consul', 'Consul', 'vault', 'Vault', 'nomad', 'Nomad','consul-template', 'envconsul'],
     default='consul', dest='program_name',
-    help='Which tool to install.  Valid values are consul, vault, nomad.')
+    help='Which tool to install.  Valid values are consul, vault, nomad, consul-template, envconsul.')
 parser.add_argument('--Version', '-v', default='latest',help='The version to download and install (default: latest open source version)')
 parser.add_argument('--Download-location', '-loc', default='https://releases.hashicorp.com', help='The URL to download from (default: https://releases.hashicorp.com)')
 parser.add_argument('--Skip-download', type=bool, default=False, help='Use local archive')
@@ -167,6 +167,34 @@ LimitNOFILE=65536
 WantedBy=multi-user.target
 '''.format(args.Install_dir)
 
+consul_template_unit_file = '''
+[Unit]
+Description=consul-template
+Requires=network-online.target
+After=network-online.target consul.service
+
+[Service]
+Restart=on-failure
+ExecStart={}/consul-template $OPTIONS -config=/etc/consul-template
+
+[Install]
+WantedBy=multi-user.target
+'''.format(args.Install_dir)
+
+envconsul_unit_file = '''
+[Unit]
+Description=envconsul
+Requires=network-online.target
+After=network-online.target consul.service
+
+[Service]
+Restart=on-failure
+ExecStart={}/envconsul $OPTIONS -config=/etc/envconsul
+
+[Install]
+WantedBy=multi-user.target
+'''.format(args.Install_dir)
+
 # Please note that this is not a fully featured lexer/parser.  You must 
 # ensure that you are passing in what will become valid HCL.
 def build_hcl_config(conf, value):
@@ -299,7 +327,6 @@ if __name__ == "__main__":
                 os.makedirs("/opt/{}/".format(program_name),exist_ok=True)
                 shutil.chown("/opt/{}/".format(program_name), user=program_name, group=program_name)
 
-
         if retrieve_binary:
             if not args.Archive_location:
                 print('Retrieving binary from {}'.format(args.Download_location))
@@ -324,9 +351,11 @@ if __name__ == "__main__":
             path = '/lib/systemd/system/{}.service'.format(program_name)
             unit_file = open(path, 'w')
             units = {
-                'consul': consul_unit_file,
-                'vault': vault_unit_file,
-                'nomad': nomad_unit_file
+                'consul'          : consul_unit_file,
+                'vault'           : vault_unit_file,
+                'nomad'           : nomad_unit_file,
+                'consul-template' : consul_template_unit_file,
+                'envconsul'       : envconsul_unit_file
             }
             unit_file.write(units[program_name])
             unit_file.close()
