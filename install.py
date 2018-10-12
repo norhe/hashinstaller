@@ -4,8 +4,10 @@ import platform
 import zipfile
 import os
 import urllib.request
+import urllib.error
 import json
 import shutil
+import sys
 
 parser = argparse.ArgumentParser(description='Install HashiCorp tools')
 
@@ -50,9 +52,13 @@ def build_dir_name():
 # should return something like '1.2.3'
 def get_latest_version():
     url = 'https://checkpoint-api.hashicorp.com/v1/check/{}'.format(program_name)
-    with urllib.request.urlopen(url) as response:
-        text = response.read().decode('utf-8')
-        return json.loads(text)['current_version']
+    try:
+        with urllib.request.urlopen(url) as response:
+            text = response.read().decode('utf-8')
+            return json.loads(text)['current_version']
+    except urllib.error.HTTPError as err:
+        print('Problem retrieving version from {}.\nTry to manually specify a version (e.g., -v 1.2.3).\nThe error was {}:  Exiting!'.format(url, err))
+        sys.exit(1)
 
 
 # https://releases.hashicorp.com/consul/1.2.3/
@@ -75,7 +81,10 @@ def unzip(filename):
 
 def download_binary(url):
     if (url.startswith('http')):
-        urllib.request.urlretrieve(url, '/tmp/{}.zip'.format(program_name))
+        try:
+            urllib.request.urlretrieve(url, '/tmp/{}.zip'.format(program_name))
+        except Exception as err:
+            print("Error downloading binary from {}.  The error was {}".format(url, err))
     elif (url.startswith('s3')):
         retrieve_from_s3(url)
     else:
