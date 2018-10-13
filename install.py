@@ -130,7 +130,7 @@ ProtectSystem=full
 ProtectHome=read-only
 PrivateTmp=yes
 PrivateDevices=yes
-SecureBits=keep-caps
+#SecureBits=keep-caps
 Capabilities=CAP_IPC_LOCK+ep
 CapabilityBoundingSet=CAP_SYSLOG CAP_IPC_LOCK
 LimitMEMLOCK=infinity
@@ -142,7 +142,7 @@ KillSignal=SIGINT
 Restart=on-failure
 RestartSec=5
 TimeoutStopSec=30
-StartLimitIntervalSec=60
+StartLimitInterval=60
 StartLimitBurst=3
 
 [Install]
