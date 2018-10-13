@@ -169,7 +169,7 @@ ExecReload=/bin/kill -HUP $MAINPID
 Restart=on-failure
 RestartSec=2
 StartLimitBurst=3
-StartLimitIntervalSec=10
+StartLimitInterval=10
 LimitNOFILE=65536
 
 [Install]
