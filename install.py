@@ -8,7 +8,7 @@ import urllib.error
 import json
 import shutil
 import sys
-import enterprise
+#import enterprise
 
 parser = argparse.ArgumentParser(description='Install HashiCorp tools')
 
