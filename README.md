@@ -29,5 +29,12 @@ Unpack an existing binary:
 python3 install.py -p consul -al /tmp/consul.zip
 ```
 
+This tool also supports retrieving enterprise versions.  Please note this requires that boto3 be installed.  You can either set up your aws credentials via file on disk as normal, or specify the environment variables boto expects ()
+```
+pip3 install boto3
+# notice -E to preserve environment variables within sudo
+sudo -E python3 install.py -p vault -loc 's3://hc-enterprise-binaries' -v 0.11.5 -ie True
+```
+
 TODO:
 Get config file building working

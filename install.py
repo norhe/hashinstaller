@@ -8,6 +8,7 @@ import urllib.error
 import json
 import shutil
 import sys
+import enterprise
 
 parser = argparse.ArgumentParser(description='Install HashiCorp tools')
 
@@ -28,6 +29,9 @@ parser.add_argument('--Create-config-file', '-ccf',default=False, help="Build co
 
 parser.add_argument('--Config-only', '-co', default=False, help="Only create the config file")
 
+parser.add_argument('--Ent-prefix', '-ep', default='prem', help='What to append to the filename when downloading enterprise versions', choices=['prem', 'pro', 'ent'])
+parser.add_argument('--Is-enterprise', '-ie', default=False, help='Append "enterprise" to filename')
+
 # Consul/Nomad options
 parser.add_argument('--Is-Server', '-server', type=bool, default=False, help="Install default server config file")
 parser.add_argument('--Datacenter', '-dc', default='dc1', help="Which datacenter is the agent in?")
@@ -44,12 +48,20 @@ program_name = args.program_name.lower()
 
 # should return something like 'consul_1.2.3'
 def build_dir_name():
+    return '{}_{}'.format(program_name, get_version())
+    #if args.Version.lower() is 'latest':
+    #    return get_latest_version()
+    #else:
+    #    return program_name + '_' + args.Version
+
+def get_version():
     if args.Version.lower() is 'latest':
         return get_latest_version()
     else:
-        return program_name + '_' + args.Version.lower()
+        return args.Version
 
-# should return something like '1.2.3'
+# Should return something like '1.2.3'
+# Please note that the checkpoint API doesn't support Vault
 def get_latest_version():
     url = 'https://checkpoint-api.hashicorp.com/v1/check/{}'.format(program_name)
     try:
@@ -67,31 +79,93 @@ def build_download_url(version):
 
 # filename: consul_1.2.3_linux_amd64.zip
 def build_file_name(version):
-    return '{}_{}_{}_amd64.zip'.format(program_name, version, platform.system().lower())
+    if args.Is_enterprise:
+        return '{}-enterprise_{}+{}_{}_amd64.zip'.format(program_name, version, args.Ent_prefix, platform.system().lower())
+    else:
+        return '{}_{}_{}_amd64.zip'.format(program_name, version, platform.system().lower())
    
 def run_cmd(command):
     subprocess.run(command.split(" "))
 
 def unzip(filename):
-    name = ''
-    with zipfile.ZipFile(filename) as zfile:
-        zfile.extractall(path='/tmp/')
+    try:
+        with zipfile.ZipFile(filename) as zfile:
+            zfile.extractall(path='/tmp/')
     # python zipfile does not preserve executable permission
-    os.chmod('/tmp/{}'.format(program_name), 0o755)
+            os.chmod('/tmp/{}'.format(program_name), 0o755)
+    except FileNotFoundError as fnf:
+        print("Oh no!  There is no file to unzip!!  The error says: {}".format(fnf))
+        sys.exit(1)
+    except Exception as e:
+        print("Something has gone terribly wrong: {}".format(e))
+        sys.exit(1)
 
 def download_binary(url):
-    if (url.startswith('http')):
-        try:
-            urllib.request.urlretrieve(url, '/tmp/{}.zip'.format(program_name))
-        except Exception as err:
-            print("Error downloading binary from {}.  The error was {}".format(url, err))
-    elif (url.startswith('s3')):
-        retrieve_from_s3(url)
-    else:
-        print("unsupported url")
+    try:
+        urllib.request.urlretrieve(url, '/tmp/{}.zip'.format(program_name))
+    except Exception as err:
+        print("Error downloading binary from {}.  The error was {}".format(url, err))
+    
+# only import boto3 if we're downloading from s3 as these will need to 
+# installed on the target system (pip3 install botocore boto3).
+# boto3 will look for access credentials in your .aws/credentials file, or
+# in AWS_ACCESS_KEY_ID, AWS_SECRET_ACCESS_KEY, and AWS_SESSION_TOKEN
+# environment variables.  Use either method to pass in valid credentials
+def s3_download(url):
+    import botocore
+    import boto3
+    
+    p = urllib.parse.urlparse(url)
+    print('p: {}'.format(p))
+    
+    #session = boto3.Session()
+    client = boto3.client('s3')
+    #s3 = session.resource('s3')
+ 
+    filename = p.path
+    print('filename: {}'.format(filename))
 
-def retrieve_from_s3(path):
-     print('define me!')
+    try:
+        #s3.Bucket(p.netloc).download_file(filename, '/tmp/{}.zip'.format(program_name))
+        client.download_file(p.netloc, p.path[1:], "/tmp/{}.zip".format(program_name))
+        print("Found file...")
+    except botocore.exceptions.ClientError as e:
+        if e.response['Error']['Code'] == "404":
+            print("The object does not exist.")
+        else:
+            raise
+    except Exception as err:
+        print('Exception occurred: {}'.format(err))
+
+def s3_exists(bucket_name, file_name):
+    return
+
+def retrieve_from_s3(version):
+    ent_url = build_ent_url(args.Download_location, program_name, version)
+    print('Downloading {} from s3...'.format(ent_url))
+    s3_download(ent_url)
+    
+
+# s3://hc-enterprise-binaries/consul/prem/1.3.0/
+# s3://hc-enterprise-binaries/vault/prem/0.11.3/
+def build_ent_url(url, program_name, version):
+    ent_url = ''
+    if program_name == 'nomad':
+      if url.endswith('/'):
+        ent_url = '{}nomad-enterprise/{}/{}'.format(url, version, build_file_name(version))
+      else:
+        ent_url = '{}/nomad-enterprise/{}/{}'.format(url, version, build_file_name(version))
+      return ent_url
+    elif program_name == 'consul' or program_name =='vault':
+      if url.endswith('/'):
+        ent_url = '{}{}/prem/{}/{}'.format(url, program_name, version, build_file_name(version))
+      else:
+        ent_url = '{}/{}/prem/{}/{}'.format(url, program_name, version, build_file_name(version))
+      return ent_url
+    else:
+      print('No enterprise path for {}.  Exiting!'.format(program_name))
+      sys.exit(1)
+
 
 # Including our unit files
 consul_unit_file = '''
@@ -142,7 +216,7 @@ KillSignal=SIGINT
 Restart=on-failure
 RestartSec=5
 TimeoutStopSec=30
-StartLimitIntervalSec=60
+StartLimitInterval=60
 StartLimitBurst=3
 
 [Install]
@@ -342,11 +416,18 @@ if __name__ == "__main__":
                 if args.Version.lower() == 'latest':
                     version = get_latest_version()
                 else:        
-                    version = args.Version    
-                url = '{}/{}'.format(args.Download_location, build_download_url(version))
-                
-                print('Downloading {}'.format(url))
-                download_binary(url)
+                    version = args.Version 
+                if args.Download_location.startswith('http'):
+                    url = '{}/{}'.format(args.Download_location, build_download_url(version))
+                    
+                    print('Downloading {}'.format(url))
+                    download_binary(url)
+                elif args.Download_location.startswith('s3'):
+                    retrieve_from_s3(version)
+                else:
+                    print('unsupported download scheme/location: {}'.format(args.Download_location))
+                    sys.exit(1)
+
             else:
                 print('Unzipping binary {}'.format(args.Archive_location))
                 unzip(args.Archive_location)
