@@ -205,7 +205,7 @@ ProtectSystem=full
 ProtectHome=read-only
 PrivateTmp=yes
 PrivateDevices=yes
-SecureBits=keep-caps
+#SecureBits=keep-caps
 Capabilities=CAP_IPC_LOCK+ep
 CapabilityBoundingSet=CAP_SYSLOG CAP_IPC_LOCK
 LimitMEMLOCK=infinity
@@ -244,7 +244,7 @@ ExecReload=/bin/kill -HUP $MAINPID
 Restart=on-failure
 RestartSec=2
 StartLimitBurst=3
-StartLimitIntervalSec=10
+StartLimitInterval=10
 LimitNOFILE=65536
 
 [Install]
