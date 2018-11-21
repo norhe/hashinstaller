@@ -80,7 +80,12 @@ def build_download_url(version):
 # filename: consul_1.2.3_linux_amd64.zip
 def build_file_name(version):
     if args.Is_enterprise:
-        return '{}-enterprise_{}+{}_{}_amd64.zip'.format(program_name, version, args.Ent_prefix, platform.system().lower())
+        if program_name == 'nomad' and args.Ent_prefix == 'prem':
+            return '{}-enterprise_{}+{}_{}_amd64.zip'.format(program_name, version, 'ent', platform.system().lower())
+        elif program_name is 'nomad' and args.Ent_prefix is 'pro':
+            return '{}-enterprise_{}+{}_{}_amd64.zip'.format(program_name, version, args.Ent_prefix, platform.system().lower())
+        else:
+            return '{}-enterprise_{}+{}_{}_amd64.zip'.format(program_name, version, args.Ent_prefix, platform.system().lower())
     else:
         return '{}_{}_{}_amd64.zip'.format(program_name, version, platform.system().lower())
    
@@ -116,14 +121,10 @@ def s3_download(url):
     import boto3
     
     p = urllib.parse.urlparse(url)
-    print('p: {}'.format(p))
     
-    #session = boto3.Session()
     client = boto3.client('s3')
-    #s3 = session.resource('s3')
  
     filename = p.path
-    print('filename: {}'.format(filename))
 
     try:
         #s3.Bucket(p.netloc).download_file(filename, '/tmp/{}.zip'.format(program_name))
