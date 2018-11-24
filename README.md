@@ -38,3 +38,4 @@ sudo -E python3 install.py -p vault -loc 's3://hc-enterprise-binaries' -v 0.11.5
 
 TODO:
 Get config file building working
+Nomad and Vault config builder is not working yet
