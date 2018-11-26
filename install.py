@@ -118,6 +118,11 @@ if __name__ == "__main__":
                 "sudo systemctl daemon-reload",
                 "sudo systemctl enable {}.service".format(program_name)
             ]
+            print("Enabling service...")
+            for cmd in commands:
+                sys_utils.run_cmd(cmd)
+        else:
+            print("Not enabling service...")
 
         if build_conf:
             print("Building {} config file".format(program_name))
