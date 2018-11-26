@@ -116,13 +116,14 @@ if __name__ == "__main__":
         if enable_service:
             commands = [
                 "sudo systemctl daemon-reload",
-                "sudo systemctl disable {}.service".format(program_name)
+                "sudo systemctl enable {}.service".format(program_name)
             ]
 
         if build_conf:
             print("Building {} config file".format(program_name))
-            config_builder.get_config_builder()[program_name]()
+            config_builder.get_config_builder()[program_name](args.Is_server, args.Datacenter, args.Autojoin)
 
     if args.Config_only or args.Create_config_file:
-        print(config_builder.get_config_builder()[program_name]())
+        print("Building {} config file".format(program_name))
+        #config_builder.get_config_builder()[program_name](args.Is_server, args.Datacenter, args.Autojoin)
 
