@@ -36,6 +36,7 @@ parser.add_argument('--Config-only', '-co', default=False, help="Only create the
 
 parser.add_argument('--Ent-prefix', '-ep', default='prem', help='What to append to the filename when downloading enterprise versions', choices=['prem', 'pro', 'ent'])
 parser.add_argument('--Is-enterprise', '-ie', default=False, help='Append "enterprise" to filename')
+parser.add_argument('--Override-filename', '-of', default=None, help='Specify file name for beta install (i.e, "consul-enterprise_1.6.0+prem-beta2_linux_amd64.zip"' )
 
 # Consul/Nomad options
 parser.add_argument('--Is-Server', '-server', type=bool, default=False, help="Install default server config file")
@@ -86,7 +87,7 @@ if __name__ == "__main__":
                     print('Downloading {}'.format(url))
                     file_utils.download_binary(program_name, url)
                 elif args.Download_location.startswith('s3'):
-                    enterprise.retrieve_from_s3(args.Download_location, version, program_name, args.Ent_prefix)
+                    enterprise.retrieve_from_s3(args.Download_location, version, program_name, args.Ent_prefix, args.Override_filename)
                 else:
                     print('unsupported download scheme/location: {}'.format(args.Download_location))
                     sys.exit(1)

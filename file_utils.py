@@ -27,12 +27,14 @@ def get_latest_version(program_name):
 
 
 # https://releases.hashicorp.com/consul/1.2.3/
-def build_download_url(program_name, version, is_enterprise = None, ent_prefix = None):
-    return '{}/{}/{}'.format(program_name, version, build_file_name(program_name, version, is_enterprise, ent_prefix))
+def build_download_url(program_name, version, is_enterprise = None, ent_prefix = None, override_filename = None):
+    return '{}/{}/{}'.format(program_name, version, build_file_name(program_name, version, is_enterprise, ent_prefix, override_filename))
 
 # filename: consul_1.2.3_linux_amd64.zip
-def build_file_name(program_name, version, is_enterprise, ent_prefix):
-    if is_enterprise:
+def build_file_name(program_name, version, is_enterprise, ent_prefix, override_filename):
+    if override_filename:
+        return override_filename
+    elif is_enterprise:
         if program_name == 'nomad' and ent_prefix == 'prem':
             return '{}-enterprise_{}+{}_{}_amd64.zip'.format(program_name, version, 'ent', platform.system().lower())
         elif program_name is 'nomad' and ent_prefix is 'pro':

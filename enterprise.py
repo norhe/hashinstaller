@@ -27,27 +27,27 @@ def s3_download(url, program_name):
     except Exception as err:
         print('Exception occurred: {}'.format(err))
 
-def retrieve_from_s3(url, version, program_name, ent_prefix):
-    ent_url = build_ent_url(url, program_name, version, ent_prefix)
+def retrieve_from_s3(url, version, program_name, ent_prefix, override_filename):
+    ent_url = build_ent_url(url, program_name, version, ent_prefix, override_filename)
     print('Downloading {} from s3...'.format(ent_url))
     s3_download(ent_url, program_name)
     
 
 # s3://hc-enterprise-binaries/consul/prem/1.3.0/
 # s3://hc-enterprise-binaries/vault/prem/0.11.3/
-def build_ent_url(url, program_name, version, ent_prefix):
+def build_ent_url(url, program_name, version, ent_prefix, override_filename = None):
     ent_url = ''
     if program_name == 'nomad':
       if url.endswith('/'):
-        ent_url = '{}nomad-enterprise/{}/{}'.format(url, version, file_utils.build_file_name(program_name, version, True, ent_prefix))
+        ent_url = '{}nomad-enterprise/{}/{}'.format(url, version, file_utils.build_file_name(program_name, version, True, ent_prefix, override_filename))
       else:
-        ent_url = '{}/nomad-enterprise/{}/{}'.format(url, version, file_utils.build_file_name(program_name, version, True, ent_prefix))
+        ent_url = '{}/nomad-enterprise/{}/{}'.format(url, version, file_utils.build_file_name(program_name, version, True, ent_prefix, override_filename))
       return ent_url
     elif program_name == 'consul' or program_name =='vault':
       if url.endswith('/'):
-        ent_url = '{}{}/prem/{}/{}'.format(url, program_name, version, file_utils.build_file_name(program_name, version, True, ent_prefix))
+        ent_url = '{}{}/prem/{}/{}'.format(url, program_name, version, file_utils.build_file_name(program_name, version, True, ent_prefix, override_filename))
       else:
-        ent_url = '{}/{}/prem/{}/{}'.format(url, program_name, version, file_utils.build_file_name(program_name, version, True, ent_prefix))
+        ent_url = '{}/{}/prem/{}/{}'.format(url, program_name, version, file_utils.build_file_name(program_name, version, True, ent_prefix,override_filename))
       return ent_url
     else:
       print('No enterprise path for {}.  Exiting!'.format(program_name))
