@@ -8,7 +8,7 @@ def build_dir_name(program_name, version):
     return '{}_{}'.format(program_name, get_version(program_name, version))
 
 def get_version(program_name, version):
-    if version.lower() is 'latest':
+    if version.lower() == 'latest':
         return get_latest_version(program_name)
     else:
         return version
@@ -37,7 +37,7 @@ def build_file_name(program_name, version, is_enterprise, ent_prefix, override_f
     elif is_enterprise:
         if program_name == 'nomad' and ent_prefix == 'prem':
             return '{}-enterprise_{}+{}_{}_amd64.zip'.format(program_name, version, 'ent', platform.system().lower())
-        elif program_name is 'nomad' and ent_prefix is 'pro':
+        elif program_name == 'nomad' and ent_prefix == 'pro':
             return '{}-enterprise_{}+{}_{}_amd64.zip'.format(program_name, version, ent_prefix, platform.system().lower())
         else:
             return '{}-enterprise_{}+{}_{}_amd64.zip'.format(program_name, version, ent_prefix, platform.system().lower())

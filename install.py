@@ -61,7 +61,7 @@ build_conf = args.Create_config_file
 
 # start the install
 if __name__ == "__main__":
-    if args.Config_only is False:
+    if not args.Config_only:
         if create_user:
             print('Creating {} user and group'.format(program_name))
             sys_utils.run_cmd('sudo adduser --no-create-home --disabled-password --gecos "" {}'.format(program_name))
@@ -70,7 +70,7 @@ if __name__ == "__main__":
             print("Creating directories")
             os.makedirs("/etc/{}/".format(program_name), exist_ok=True)
             shutil.chown("/etc/{}/".format(program_name), user=program_name, group=program_name)
-            if program_name is not "vault":
+            if program_name != "vault":
                 os.makedirs("/opt/{}/".format(program_name),exist_ok=True)
                 shutil.chown("/opt/{}/".format(program_name), user=program_name, group=program_name)
 
